@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PancrePal — Iteration 1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#ffffff;--card:#f7f7f8;--line:#e8e8ea;--text:#222}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .grid{display:grid;gap:16px}
+    .cols{grid-template-columns:1.5fr 1fr}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+    h1{font-size:22px;margin:0 0 4px}
+    h2{font-size:18px;margin:0 0 8px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input, select, button{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+    button{cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border:1px solid var(--line);padding:8px;text-align:left}
+    th{background:#fafafa}
+    .avatar{font-size:48px}
+    .muted{opacity:.7}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fff}
+    .spacer{height:8px}
+    .danger{color:#b00020}
+    .success{color:#0b7a38}
+    .toolbar button{background:#fff}
+    .preset{display:flex;gap:8px;align-items:center}
+    .preset form{display:inline}
+    .small{font-size:12px}
+    .link{color:#0b5dd7;text-decoration:none}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="wrap grid cols">
+    <!-- Left: Logging + Chart -->
+    <div class="grid" style="align-content:start;">
+      <div class="card">
+        <h1>PancrePal</h1>
+        <div class="row">
+          <div class="avatar" title="Mood avatar">{{ avatar }}</div>
+          <div>
+            <div class="muted">{{ avatar_msg }}</div>
+            <div class="small muted">A friendly nudge based on your recent logs.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Quick Add</h2>
+        <form method="post" action="/entries">
+          <div class="row">
+            <input type="number" step="0.1" name="glucose" placeholder="Glucose (mmol/L)" required />
+            <input type="text" name="meal" placeholder="Meal (optional)" />
+            <select name="time_of_day" title="Time of day">
+              <option value="">Time</option>
+              <option>Breakfast</option>
+              <option>Lunch</option>
+              <option>Dinner</option>
+              <option>Snack</option>
+              <option>Training</option>
+            </select>
+            <select name="mood" title="Mood">
+              <option value="">Mood</option>
+              <option>😊</option><option>😐</option><option>😞</option>
+            </select>
+            <button type="submit">Add</button>
+          </div>
+
+          <div class="spacer"></div>
+          <div class="row toolbar">
+            <button type="button" class="pill" onclick="setTime('Breakfast')">Breakfast</button>
+            <button type="button" class="pill" onclick="setTime('Lunch')">Lunch</button>
+            <button type="button" class="pill" onclick="setTime('Dinner')">Dinner</button>
+            <button type="button" class="pill" onclick="setTime('Snack')">Snack</button>
+            <button type="button" class="pill" onclick="setTime('Training')">Training</button>
+            <button type="button" class="pill" onclick="setMood('😊')">😊</button>
+            <button type="button" class="pill" onclick="setMood('😐')">😐</button>
+            <button type="button" class="pill" onclick="setMood('😞')">😞</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Shorter, cleaner chart -->
+      <div class="card">
+        <h2>Weekly Glucose Trend</h2>
+        <div style="height:180px;">
+          <canvas id="weeklyChart"></canvas>
+        </div>
+        <div class="small muted">Shows average glucose levels for the last 7 days.</div>
+      </div>
+
+      <div class="card">
+        <h2>Entries</h2>
+        <table>
+          <tr>
+            <th>ID</th><th>Glucose</th><th>Meal</th><th>Mood</th><th>Time</th><th>Noted At</th><th>Actions</th>
+          </tr>
+          {% for e in entries %}
+          <tr>
+            <td>{{ e.id }}</td>
+            <td>{{ "%.1f"|format(e.glucose) }}</td>
+            <td>{{ e.meal or "-" }}</td>
+            <td>{{ e.mood or "-" }}</td>
+            <td>{{ e.time_of_day or "-" }}</td>
+            <td>{{ e.noted_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>
+              <form method="post" action="/entries/{{ e.id }}" class="row" style="gap:6px;align-items:center;">
+                <input type="number" step="0.1" name="glucose" placeholder="new glucose" />
+                <input type="text" name="meal" placeholder="new meal" />
+                <select name="mood">
+                  <option value="">(keep)</option>
+                  <option>😊</option><option>😐</option><option>😞</option>
+                </select>
+                <select name="time_of_day">
+                  <option value="">(keep)</option>
+                  <option>Breakfast</option><option>Lunch</option>
+                  <option>Dinner</option><option>Snack</option><option>Training</option>
+                </select>
+                <button>Update</button>
+              </form>
+              <form method="post" action="/entries/{{ e.id }}/delete" onsubmit="return confirm('Delete entry {{ e.id }}?')">
+                <button class="danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+        <p class="small muted">JSON API: <a class="link" href="/api/entries">/api/entries</a></p>
+      </div>
+    </div>
+
+    <!-- Right: Presets + Ethics -->
+    <div class="grid" style="align-content:start;">
+      <div class="card">
+        <h2>Favourites / Presets</h2>
+        <form method="post" action="/presets" class="row">
+          <input type="text" name="name" placeholder="Preset name (e.g. Porridge)" required />
+          <input type="number" step="0.1" name="default_glucose" placeholder="Default glucose (optional)" />
+          <select name="default_mood">
+            <option value="">Mood (opt)</option>
+            <option>😊</option><option>😐</option><option>😞</option>
+          </select>
+          <select name="default_time_of_day">
+            <option value="">Time (opt)</option>
+            <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option><option>Training</option>
+          </select>
+          <button type="submit">Add Preset</button>
+        </form>
+
+        <div class="spacer"></div>
+        {% if presets|length == 0 %}
+          <div class="muted small">No presets yet. Add your first above.</div>
+        {% else %}
+          {% for p in presets %}
+          <div class="preset">
+            <span class="pill">{{ p.name }}</span>
+            <form method="post" action="/presets/{{ p.id }}/use" class="row">
+              <input type="number" step="0.1" name="glucose" placeholder="Override glucose (opt)" />
+              <button type="submit">Use</button>
+            </form>
+            <form method="post" action="/presets/{{ p.id }}/delete">
+              <button class="danger">Delete</button>
+            </form>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Ethical & GDPR</h2>
+        <p class="small">
+          PancrePal stores data locally in a private PostgreSQL database on this device.
+          No clinical decisions are made by this prototype. See the full statement:
+          <a class="link" href="/privacy">Privacy & Ethics</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart.js -->
+  <script>
+    function setTime(value){
+      document.querySelector('select[name="time_of_day"]').value = value;
+    }
+    function setMood(value){
+      document.querySelector('select[name="mood"]').value = value;
+    }
+
+    const labels = {{ labels|tojson }};
+    const dataVals = {{ chart_values|tojson }};
+
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: "Daily Avg (last 7 days)",
+          data: dataVals,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: false,
+            grid: { color: "#eee" },
+            title: { display: true, text: "Glucose (mmol/L)" }
+          },
+          x: {
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
